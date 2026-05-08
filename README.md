@@ -34,7 +34,7 @@ item_factors ∈ R^(num_items × k)
 
 ### CF + Content-based filtering - LightFM
 LightFM hybrid recommender pipeline on an audio interactions dataset:                                                        
-1. Load — reads 300k rows from interactions_audio_v2.1.parquet (10,811 users × 14,283 songs).                                           
+1. Load — reads 600k rows from interactions_audio_v2.1.parquet (10,811 users × 14,283 songs).                                           
 2. Index & split — encodes user_id/song_id to integer codes, then per-user 80/20 train/test split (244,329 / 55,671).                   
 3. Build CSR matrices — binary user×item interaction matrices for train/test.                                                           
 4. Build item-feature matrix — each song is represented by
@@ -69,45 +69,52 @@ All metrics below are evaluated by `utils.distance_metrics.evaluate_all` on both
 - **l2** — Euclidean distance `‖u − v‖₂ = √Σ (uᵢ − vᵢ)²`. Distance (lower is better). Standard geometric distance; on the unit sphere it is monotonically equivalent to cosine, which is why `dot`, `cos`, and `l2` collapse to identical rankings after L2 normalization.
 - **l1** — Manhattan / taxicab distance `Σ |uᵢ − vᵢ|`. Distance. More robust to outliers in individual coordinates than `l2` because differences are not squared.
 - **linf** — Chebyshev distance `maxᵢ |uᵢ − vᵢ|`. Distance. Determined by the single worst-matching coordinate; tends to be the weakest ranker here because it discards information from all other dimensions.
-- **lp_0.5** — fractional Minkowski distance `(Σ |uᵢ − vᵢ|^0.5)^(1/0.5)`. Distance. With p < 1 the unit ball is non-convex and small differences are amplified relative to large ones; sometimes argued to behave better than `l2` in high dimensions, but here it underperforms on raw ALS/LightFM factors.
-- **maha** — Mahalanobis distance `√((u − v)ᵀ Σ⁻¹ (u − v))`, where `Σ` is the (diagonal-regularized) covariance of the embedding matrix. Distance. Whitens the space so each principal direction contributes equally — useful when feature scales/variances differ a lot, as in the 49-dim raw audio feature space.
 
 ### Results
 
 Top-10 evaluation across embedding sources and distance metrics. Each cell shows Precision@10 / Recall@10 / NDCG@10.
+k - the size of ALS embeddings
 
 #### Raw embeddings
 
 | Metric | Content (audio, 49d) | ALS k=8 | ALS k=50 | LightFM |
 |--------|----------------------|---------|----------|---------|
-| dot    | 0.0016 / 0.0038 / 0.0027 | 0.0242 / 0.0501 / 0.0419 | 0.0531 / 0.1163 / 0.0992 | 0.0121 / 0.0231 / 0.0198 |
-| cos    | 0.0031 / 0.0080 / 0.0061 | 0.0169 / 0.0403 / 0.0308 | 0.0513 / 0.1170 / 0.1005 | 0.0108 / 0.0208 / 0.0179 |
-| l2     | 0.0015 / 0.0039 / 0.0029 | 0.0242 / 0.0501 / 0.0419 | 0.0533 / 0.1166 / 0.0995 | 0.0039 / 0.0072 / 0.0061 |
-| l1     | 0.0015 / 0.0043 / 0.0029 | 0.0158 / 0.0323 / 0.0262 | 0.0380 / 0.0854 / 0.0700 | 0.0034 / 0.0059 / 0.0052 |
-| linf   | 0.0011 / 0.0026 / 0.0020 | 0.0112 / 0.0238 / 0.0180 | 0.0103 / 0.0222 / 0.0175 | 0.0027 / 0.0046 / 0.0041 |
-| lp_0.5 | 0.0015 / 0.0043 / 0.0029 | 0.0060 / 0.0111 / 0.0089 | 0.0103 / 0.0213 / 0.0171 | 0.0028 / 0.0045 / 0.0041 |
-| maha   | 0.0021 / 0.0063 / 0.0043 | 0.0230 / 0.0460 / 0.0396 | 0.0452 / 0.0973 / 0.0861 | 0.0042 / 0.0075 / 0.0065 |
+| dot    | 0.0016 / 0.0038 / 0.0027 | 0.0236 / 0.0481 / 0.0406 | 0.0517 / 0.1122 / 0.0962 | 0.0135 / 0.0266 / 0.0228 |
+| cos    | 0.0031 / 0.0080 / 0.0061 | 0.0175 / 0.0391 / 0.0307 | 0.0498 / 0.1126 / 0.0975 | 0.0123 / 0.0255 / 0.0207 |
+| l2     | 0.0015 / 0.0039 / 0.0029 | 0.0236 / 0.0481 / 0.0406 | 0.0519 / 0.1128 / 0.0965 | 0.0055 / 0.0112 / 0.0097 |
+| l1     | 0.0015 / 0.0043 / 0.0029 | 0.0162 / 0.0324 / 0.0249 | 0.0370 / 0.0830 / 0.0687 | 0.0050 / 0.0100 / 0.0088 |
+| linf   | 0.0011 / 0.0026 / 0.0020 | 0.0060 / 0.0115 / 0.0094 | 0.0097 / 0.0186 / 0.0154 | 0.0035 / 0.0071 / 0.0062 |
 
 #### L2-normalized embeddings
 
 | Metric | Content (audio, 49d) | ALS k=8 | ALS k=50 | LightFM |
 |--------|----------------------|---------|----------|---------|
-| dot    | 0.0031 / 0.0080 / 0.0061 | 0.0169 / 0.0403 / 0.0308 | 0.0513 / 0.1170 / 0.1005 | 0.0108 / 0.0208 / 0.0179 |
-| cos    | 0.0031 / 0.0080 / 0.0061 | 0.0169 / 0.0403 / 0.0308 | 0.0513 / 0.1170 / 0.1005 | 0.0108 / 0.0208 / 0.0179 |
-| l2     | 0.0031 / 0.0080 / 0.0061 | 0.0169 / 0.0403 / 0.0308 | 0.0513 / 0.1170 / 0.1005 | 0.0108 / 0.0208 / 0.0179 |
-| l1     | 0.0031 / 0.0082 / 0.0061 | 0.0162 / 0.0382 / 0.0295 | 0.0477 / 0.1101 / 0.0939 | 0.0095 / 0.0192 / 0.0161 |
-| linf   | 0.0023 / 0.0052 / 0.0042 | 0.0158 / 0.0372 / 0.0287 | 0.0321 / 0.0771 / 0.0651 | 0.0068 / 0.0139 / 0.0115 |
-| lp_0.5 | 0.0028 / 0.0073 / 0.0056 | 0.0143 / 0.0339 / 0.0265 | 0.0408 / 0.0970 / 0.0814 | 0.0070 / 0.0141 / 0.0119 |
-| maha   | 0.0027 / 0.0076 / 0.0054 | 0.0156 / 0.0352 / 0.0275 | 0.0501 / 0.1104 / 0.0948 | 0.0087 / 0.0172 / 0.0147 |
+| dot    | 0.0031 / 0.0080 / 0.0061 | 0.0175 / 0.0391 / 0.0307 | 0.0498 / 0.1126 / 0.0975 | 0.0123 / 0.0255 / 0.0207 |
+| cos    | 0.0031 / 0.0080 / 0.0061 | 0.0175 / 0.0391 / 0.0307 | 0.0498 / 0.1126 / 0.0975 | 0.0123 / 0.0255 / 0.0207 |
+| l2     | 0.0031 / 0.0080 / 0.0061 | 0.0175 / 0.0391 / 0.0307 | 0.0489 / 0.1112 / 0.0961 | 0.0123 / 0.0255 / 0.0207 |
+| l1     | 0.0031 / 0.0082 / 0.0061 | 0.0167 / 0.0379 / 0.0294 | 0.0450 / 0.1028 / 0.0886 | 0.0105 / 0.0218 / 0.0176 |
+| linf   | 0.0023 / 0.0052 / 0.0042 | 0.0162 / 0.0360 / 0.0285 | 0.0309 / 0.0743 / 0.0633 | 0.0073 / 0.0142 / 0.0124 |
 
-Users evaluated: Content 22,328 · ALS (k=8, k=50) 33,229 · LightFM 10,247.
+Users evaluated: Content 22,328 · ALS (k=8, k=50) 19,882 · LightFM 20,622. `lp_0.5` and `maha` were only run on the content-based audio embeddings.
+
+#### Library built-in evaluators
+
+For reference, the same models evaluated with their library's built-in scorers (no manual top-K loop, no L2 normalization):
+
+| Source | Built-in call | Precision@10 | Recall@10 | NDCG@10 |
+|--------|---------------|--------------|-----------|---------|
+| ALS k=8  | `model.recommend(...)` (implicit) | 0.0236 | 0.0481 | 0.0406 |
+| ALS k=50 | `model.recommend(...)` (implicit) | 0.0517 | 0.1122 | 0.0962 |
+| LightFM  | `lightfm.evaluation.precision_at_k` / `recall_at_k` | 0.0279 | 0.0572 | — |
+
+`implicit`'s `model.recommend` ranks by dot product, so its numbers reproduce the "raw dot" rows of the ALS columns above. LightFM's built-in scorers also rank by `model.predict`, but include the learned user/item biases on top of the latent dot product, which is why they outperform the bias-free "raw dot" row for LightFM (0.0279 vs 0.0135). LightFM's helpers don't expose NDCG.
 
 Takeaways:
-- ALS at k=50 dominates across the board; raw `l2`/`dot` (≈0.053 P@10) edge out cosine, with `maha` close behind.
+- ALS at k=50 dominates across the board; raw `l2`/`dot` (≈0.052 P@10) edge out cosine.
 - Going from k=8 to k=50 roughly doubles all three metrics on ALS — latent capacity matters more than the choice of distance.
-- After L2 normalization, `dot`, `cos`, and `l2` collapse to identical scores, as expected on the unit sphere.
+- After L2 normalization, `dot`, `cos`, and `l2` collapse to (near-)identical scores, as expected on the unit sphere.
 - Content-only (audio features) embeddings trail ALS by an order of magnitude — collaborative signal is not recoverable from audio alone.
-- LightFM hybrid sits between content-only and ALS k=50 here; raw `dot` is its best single setting (P@10 ≈ 0.0121).
+- LightFM hybrid sits between content-only and ALS k=50; raw `dot` is its best single setting (P@10 ≈ 0.0135), and `l2`/`l1` on raw LightFM factors collapse badly because the learned vectors have very uneven magnitudes.
 
 ## Datasets
 - [Triplets of users' interactions](http://millionsongdataset.com/tasteprofile/)
