@@ -1,6 +1,6 @@
 # Music Recommender System
 ## Project Overview
-The projest target is to estimate a number of distance-based metrics on embeddings of different origins and sizes.
+The project studies how the geometry of learned embeddings interacts with different ranking functions.
 
 The illustrative experiment is a music recommendation system which uses content-based, collaborative filtering and both of these approaches at once. 
 
